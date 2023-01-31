@@ -22,5 +22,9 @@
   },
   "include": [
     "src"
-  ]
+  ],
+  "paths": {
+    "zlib": ["node_modules/browserify-zlib"],
+    "stream": ["node_modules/stream-browserify"]
+  }
 }
