@@ -1,16 +1,17 @@
 import { WebSocketServer, WebSocket } from 'ws';
+import { jsonToMaintenanceNotice } from 'maintenance-notice';
 
 const wss = new WebSocketServer({ port: 4040 });
 
 let connections: WebSocket[] = [];
-let messages: string[] = [];
+let messageHistory: string[] = [];
 
 wss.on('connection', (ws) => {
   console.log('- connectioned ', connections.length);
   connections.push(ws);
-  if (messages.length > 0) {
-    console.log('-  send backlog X ', messages.length)
-    messages.forEach(message => ws.send(message));
+  if (messageHistory.length > 0) {
+    console.log('-  send history X ', messageHistory.length)
+    messageHistory.forEach(message => ws.send(message));
   }
 
   ws.on('close', () => {
@@ -21,7 +22,14 @@ wss.on('connection', (ws) => {
 
   ws.on('message', (data) =>  {
     const message = data.toString();
-    messages.push(message);
+    const notice = jsonToMaintenanceNotice(message);
+
+    if (notice.command && notice.command == "CLAER") {
+      console.log('- clear history');
+      messageHistory = [];
+    } else {
+      messageHistory.push(message);
+    }
 
     console.log('- send message:', message, ' X ', connections.length);
     connections.forEach(con => con.send(message));

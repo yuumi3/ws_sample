@@ -1,19 +1,24 @@
 import { useState, useEffect } from 'react';
 import useWebSocket, { ReadyState } from 'react-use-websocket';
-import { jsonToMaintenanceNotification, maintenanceNotificationToJSon } from './NotificationType';
+import { MaintenanceNoticeType, jsonToMaintenanceNotice, maintenanceNoticeToJSon } from 'maintenance-notice';
 
 const SocketUrl = "ws://localhost:4040";
 
 export const App = () => {
-  const [notifications, setNotifications] = useState<string[]>([]);
+  const [notices, setNotices] = useState<MaintenanceNoticeType[]>([]);
   const [message, setMessage] = useState("");
   const { sendMessage, lastMessage, readyState } = useWebSocket(SocketUrl);
 
   useEffect(() => {
     if (lastMessage !== null) {
-      setNotifications((prevNotifications) => prevNotifications.concat(lastMessage.data));
+      const notice = jsonToMaintenanceNotice(lastMessage.data);
+      if (notice.command && notice.command == "CLAER") {
+        setNotices([]);
+      } else {
+        setNotices((prevNotice) => prevNotice.concat(notice));
+      }
     }
-  }, [lastMessage, setNotifications]);
+  }, [lastMessage, setNotices]);
 
   switch (readyState) {
   case ReadyState.CLOSED:
@@ -23,12 +28,14 @@ export const App = () => {
       <>
         <input type="text" onChange={e => setMessage(e.target.value)} />
         <button onClick={_ => {
-          sendMessage(maintenanceNotificationToJSon(new Date(), message));
-        }}>Send</button>
+          sendMessage(maintenanceNoticeToJSon(new Date(), message));
+        }}> Send </button>
+        <button onClick={_ => {
+          sendMessage(maintenanceNoticeToJSon(new Date(), "", "CLAER"));
+        }}> Clear </button>
         <ul>
-          {notifications.map((notification, idx) => {
-            const notice = jsonToMaintenanceNotification(notification);
-            const date =notice.date.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" });
+          {notices.map((notice, idx) => {
+            const date = notice.date.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" });
             return (
               <li key={idx}>
                 <span style={{fontSize: '60%'}}>{date} </span>

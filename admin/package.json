@@ -10,6 +10,7 @@
     "@types/node": "^16.18.11",
     "@types/react": "^17.0.11",
     "@types/react-dom": "^17.0.11",
+    "maintenance-notice": "file:../maintenance-notice",
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
     "react-scripts": "5.0.1",

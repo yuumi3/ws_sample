@@ -1,18 +1,23 @@
 import { useState, useEffect } from 'react';
 import useWebSocket, { ReadyState } from 'react-use-websocket';
-import { jsonToMaintenanceNotification } from './NotificationType';
+import { MaintenanceNoticeType, jsonToMaintenanceNotice, maintenanceNoticeToJSon } from 'maintenance-notice';
 
 const SocketUrl = "ws://localhost:4040";
 
 export const App = () => {
-  const [notifications, setNotifications] = useState<string[]>([]);
+  const [notices, setNotices] = useState<MaintenanceNoticeType[]>([]);
   const { lastMessage, readyState } = useWebSocket(SocketUrl);
 
   useEffect(() => {
     if (lastMessage !== null) {
-      setNotifications((prevNotifications) => prevNotifications.concat(lastMessage.data));
-    }
-  }, [lastMessage, setNotifications]);
+      const notice = jsonToMaintenanceNotice(lastMessage.data);
+      if (notice.command && notice.command == "CLAER") {
+        setNotices([]);
+      } else {
+        setNotices((prevNotice) => prevNotice.concat(notice));
+      }
+  }
+  }, [lastMessage, setNotices]);
 
   switch (readyState) {
   case ReadyState.CLOSED:
@@ -21,8 +26,7 @@ export const App = () => {
     return (
       <>
         <ul>
-          {notifications.map((notification, idx) => {
-            const notice = jsonToMaintenanceNotification(notification);
+          {notices.map((notice, idx) => {
             const date =notice.date.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" });
             return (
               <li key={idx}>
