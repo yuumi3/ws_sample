@@ -1,6 +1,6 @@
 # WebSocket サンプル
 
-WebSocketを使ってReactアプリの全利用者に通知を行うコードのサンプルです。
+WebSocketを使ってReactアプリの全利用者に通知を行うサンプル・コードです。
 
 ## 概要
 
@@ -9,9 +9,9 @@ WebSocketを使ってReactアプリの全利用者に通知を行うコードの
 1. Admin: 通知情報を入力・送信するReactアプリ
    - Clearボタンを押すとサーバーおよび全クライアントの通知が消去されます
 2. Client: 通知を受け取るReactアプリ
-3. Server: WebSocketのnode.jsサーバーで、Adminから送られて来た通知を全Clientに送信します
+3. Server: WebSocketのnode.jsサーバーで、Adminから送られてきた通知を全Clientに送信します
    - 全ClientとのWebScket接続を管理しています
-   - 後から接続されたClientにも全通知が送れます
+   - 後から接続されたClientにも全通知が送信されます
 
 ![](/images/ws_sample.png)
 
@@ -28,7 +28,7 @@ WebSocketを使ってReactアプリの全利用者に通知を行うコードの
 ├── admin               通知情報を入力・送信するReactアプリ
 ├── client              通知を受け取るReactアプリ
 ├── images              ドキュメント用画像
-├── maintenance-notice  通知形式のライブラリー
+├── maintenance-notice  通知ライブラリー
 └── server              WebSocketのサーバー
 ```
 
@@ -36,7 +36,7 @@ WebSocketを使ってReactアプリの全利用者に通知を行うコードの
 
 ### maintenance-notice
 
-WebSocketでやり取りされるオブジェクトの型とJSONとの変換関数が定義されています
+WebSocketでやり取りされるオブジェクトの型とJSONとの変換関数が定義されています。
 
 - index.ts
 
@@ -134,10 +134,10 @@ export const App = () => {
 export default App;
 ```
 
-- ① サーバーのURL
-- ② サーバーから受信した通知のState
-- ③ メッセージ入力用State
-- ④ useWebSocketの実行戻り値は
+- ① WebSockerサーバーのURL
+- ② notices : サーバーから受信した全通知のState
+- ③ message : メッセージ入力用State
+- ④ WebSocket用Hook、戻り値は
    - sendMessage : 送信用関数
    - lastMessage : 最新の受信値
    - readyState : WebSocketの状態
@@ -208,14 +208,108 @@ wss.on('connection', (ws) => {   // ← ④
 - ② connections : 接続されているクライアント接続情報（WebSocket）の配列
 - ③ messageHistory : 過去に送信した通知データ（JSON文字列）の配列
 - ④ クライアントが接続されると、この処理が始まります
-- ⑤ クライアント接続情報をconnectionsに追加
-- ⑥ 接続前に送信した通知データがあれば、接続したクライアントに送信
+   - ⑤ クライアント接続情報をconnectionsに追加
+   - ⑥ 接続前に送信した通知データがあれば、接続したクライアントに送信
 - ⑦ クライアントの接続が切れたときに、この処理が始まります
-- ⑧ 切れた接続を見つけ
-- ⑨ その接続をconnectionsから削除します
+   - ⑧ 切れた接続を見つけ
+   - ⑨ その接続をconnectionsから削除します
 - ⑩ メッセージを受信したときに、この処理が始まります
-- ⑪ 受信データ（JSON文字列）を通知型のオブジェクトに変換
-- ⑫ もし通知がCLAERコマンドなら、受信したmessageHistoryをクリアします
-- ⑬ それ以外なら受信データをmessageHistoryに追加
-- ⑭ 受信データを接続中の全クライアントに送信
+   - ⑪ 受信データ（JSON文字列）を通知型のオブジェクトに変換
+   - ⑫ もし通知がCLAERコマンドなら、受信したmessageHistoryをクリアします
+   - ⑬ それ以外なら受信データをmessageHistoryに追加
+   - ⑭ 受信データを接続中の全クライアントに送信
 - ⑮ エラーが発生したときに、この処理が始まります
+
+## インストール・起動方法
+
+### 1. インストールとmaintenance-notice
+
+```sh
+$ git clone https://github.com/yuumi3/ws_sample
+$ cd ws_sample
+$ cd maintenance-notice
+$ npm install
+$ npm start
+$ 
+```
+
+### 2. Server
+
+```sh
+$ cd ../server
+$ npm install
+$ npm start
+
+> server@1.0.0 start
+> ts-node src/index.ts
+```
+
+### 3. Admin
+
+別ターミナルを起動してください。
+
+```sh
+$ cd ws_sample
+$ cd admin
+$ npm install
+$ npm start
+
+・・・
+
+You can now view client in the browser.
+
+  Local:            http://localhost:3010
+  On Your Network:  http://192.168.3.36:3010
+
+Note that the development build is not optimized.
+To create a production build, use npm run build.
+
+webpack compiled successfully
+Files successfully emitted, waiting for typecheck results...
+Issues checking in progress...
+No issues found.
+```
+
+ブラウザーで `http://localhost:3010` をアクセスすると下のような画面が表示されます。
+
+![](/images/admin1.png)
+
+入力欄にメッセージを入力し、Sendボタンを押すと、下のようにメッセージが表示されます。
+
+![](/images/admin2.png)
+
+### 3. Client
+
+別ターミナルを起動してください。
+
+
+```sh
+$ cd ws_sample
+$ cd admin
+$ npm install
+$ npm start
+
+・・・
+
+You can now view client in the browser.
+
+  Local:            http://localhost:3000
+  On Your Network:  http://192.168.3.36:3000
+
+Note that the development build is not optimized.
+To create a production build, use npm run build.
+
+webpack compiled successfully
+Files successfully emitted, waiting for typecheck results...
+Issues checking in progress...
+No issues found.
+```
+
+ブラウザーで `http://localhost:3000` をアクセスすると下のようにメッセージが表示されます。
+
+![](/images/client1.png)
+
+
+## License
+
+[MIT License](http://www.opensource.org/licenses/MIT).
