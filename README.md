@@ -72,9 +72,7 @@ export const jsonToMaintenanceNotice = (json: string): MaintenanceNoticeType => 
 ```
 
 
-### Admin(Client)
-
-ClientはAdminから通知送信機能を削除したものです。
+### Admin
 
 
 ```jsx
@@ -219,6 +217,207 @@ wss.on('connection', (ws) => {   // ← ④
    - ⑬ それ以外なら受信データをmessageHistoryに追加
    - ⑭ 受信データを接続中の全クライアントに送信
 - ⑮ エラーが発生したときに、この処理が始まります
+
+
+### Client
+
+UIを追加しました。🔔
+
+##### 1. useMaintenanceNotice.ts
+
+WebSocketとの通信部分はHookにしました。
+
+```ts
+
+import { MaintenanceNoticeType, jsonToMaintenanceNotice } from 'maintenance-notice';
+import { useEffect, useState } from 'react';
+import useWebSocket, { ReadyState } from 'react-use-websocket';
+
+const SocketUrl = "ws://localhost:4040";                                 // ← ①
+
+// useMaintenanceNoticeの戻り値の型
+type UseMaintenanceNoticeReturnType = {
+  notices: MaintenanceNoticeType[],        // MaintenanceNoticeの配列
+  socketError: boolean                     // 通信エラー発生
+}
+// 通知をWebScoketで受け取るHook
+
+const useMaintenanceNotice = (): UseMaintenanceNoticeReturnType => {
+  const [notices, setNotices] = useState<MaintenanceNoticeType[]>([]);   // ← ②
+  const { lastMessage, readyState } = useWebSocket(SocketUrl);           // ← ③
+
+  useEffect(() => {                                                      // ← ④
+    if (lastMessage !== null) {
+      const notice = jsonToMaintenanceNotice(lastMessage.data);
+      if (notice.command && notice.command === "CLAER") {
+        setNotices([]);
+      } else {
+        setNotices((prevNotice) => prevNotice.concat(notice));
+      }
+    }
+  }, [lastMessage, setNotices]);
+
+  if (readyState === ReadyState.CLOSED) {
+    return {notices: [], socketError: true};         // ← ⑤
+  } else {
+    return {notices, socketError: false};            // ← ⑥
+  }
+}
+
+export default useMaintenanceNotice
+```
+
+
+- ① WebSockerサーバーのURL
+- ② notices : サーバーから受信した全通知のState
+- ③ WebSocket用Hook、戻り値は
+   - lastMessage : 最新の受信値
+   - readyState : WebSocketの状態
+- ④ WebSocketを受信した時の処理は`useEffect`を使って lastMessage の変更時に行われます
+   - lastMessage.dataは受信したJSON文字列です
+   - jsonToMaintenanceNotice()でJSON文字列を通知型のオブジェクトに変換します
+   - もし通知がCLAERコマンドなら、受信した通知Stateをクリアします
+   - それ以外なら受信した通知Stateの最後に追加します
+- ⑤ ReadyState.CLOSEDはサーバーが動作してない場合なのでエラーを戻します
+- ⑥ それ以外の状態はnoticesを戻します
+
+#### 2. App.tsx
+
+UIには以下を使っています
+
+- IconButton　アイコンボタン
+- Badge　バッジ（右上の）件数表示
+- Card　通知リスト表示の枠
+- Alert 通知（アラート）表示
+- Slide　通知表示コンポーネントの移動アニメーション
+
+```jsx
+import React, { useState } from "react";
+import useMaintenanceNotice from "./useMaintenanceNotice";
+import { MaintenanceNoticeType } from "maintenance-notice";
+
+import { AppBar, Badge, Button, Card, CardContent, CardHeader, IconButton, makeStyles, Slide, Toolbar, Typography } from "@material-ui/core";
+import { Alert } from '@material-ui/lab';
+import CloseIcon             from '@material-ui/icons/Close';
+import NotificationsIcon     from '@material-ui/icons/Notifications';
+import NotificationsNoneIcon from '@material-ui/icons/NotificationsNone';
+
+// 通知リスト表示コンポーネント               // ← ①
+type MaintenanceNoticeAlertProps = {
+  notices: MaintenanceNoticeType[],
+  onClose: () => void
+}
+const MaintenanceNoticeAlerts: React.FC<MaintenanceNoticeAlertProps> = ({notices, onClose}) => {
+  return (
+    <Card>
+      <CardHeader
+        title="通知"
+        action={
+          <IconButton onClick={_ => onClose()} color="primary" aria-label="upload picture" component="span">
+            <CloseIcon />
+          </IconButton>
+        }
+      />
+      <CardContent>
+        {notices.map((notice, idx) => {
+          const date = notice.date.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" });
+          return (
+            <Alert key={idx} style={{marginBottom: 10}} severity="warning"><span style={{fontSize: '60%'}}>{date} </span> — <span>{notice.message}</span></Alert>
+          );
+        })}
+      </CardContent>
+    </Card>
+  )
+}
+
+// 通知アイコン                            // ← ②
+type NotificationsBellIconProps = {
+  notices: MaintenanceNoticeType[],
+  socketError: boolean
+}
+const NotificationsBellIcon: React.FC<NotificationsBellIconProps> = ({socketError, notices}) => {
+  if (socketError) {
+    return <NotificationsIcon color="error" />;
+  } else if (notices.length === 0) {
+    return <NotificationsNoneIcon />;
+  } else {
+    return <NotificationsIcon />;
+  }
+};
+
+
+const App = () => {
+  const {notices, socketError} = useMaintenanceNotice();     // ← ③
+  const [showNotice, setShowNotice] = useState(false);       // ← ④
+
+  const useStyles = makeStyles((theme) => ({
+    root: {
+      flexGrow: 1,
+    },
+    menuButton: {
+      marginRight: theme.spacing(2),
+    },
+    title: {
+      flexGrow: 1,
+    },
+    work: {
+      margin: 10
+    }
+  }));
+
+  const classes = useStyles();
+
+  return (
+    <div>
+      <AppBar position="static">
+        <Toolbar>
+          <Typography variant="h6" className={classes.title}>
+            Apps
+          </Typography>
+          <IconButton onClick={_ => setShowNotice(!showNotice)} color="inherit">  // ← ⑤
+            <Badge badgeContent={notices.length} color="secondary">
+              <NotificationsBellIcon notices={notices} socketError={socketError} />
+            </Badge>
+          </IconButton>
+          <Button color="inherit">Logout</Button>
+        </Toolbar>
+      </AppBar>
+      <div className={classes.work}>
+        {socketError ?                                         // ← ⑥
+          <Alert severity="error">通知サーバーまたはネットワークに問題が発生しています</Alert> :
+          <Slide direction="up" in={showNotice && notices.length > 0} mountOnEnter unmountOnExit>  // ← ⑦
+            <div>
+              <MaintenanceNoticeAlerts notices={notices} onClose={() => setShowNotice(false)}/>  // ← ⑧
+            </div>
+          </Slide>
+        }
+      </div>
+    </div>
+  )
+}
+
+export default App;
+```
+
+- ① 通知リストを表示するコンポーネント
+    - Card(MUI)コンポーネントの上に通知リストを表示しています
+    - 1つの通知はAlert(MUI)コンポーネントを使っています
+    - 閉じるボタンがあります
+- ② 通知アイコンを表示するコンポーネント
+    - エラー、通知無し、通知有りで表示するアイコンを切り替えています
+- ③ useMaintenanceNotice呼び出し
+    - 通知の配列と通信エラーが戻ります
+    - 通知を受け取るとAppコンポーネントは再描画されます
+- ④ 通知リスト表示On/OffのState
+- ⑤ 通知ICON
+    - クリックすると通知リストを表示します
+    - 通知件数がBadgeで右上に表示されます
+    - アイコンはエラー、通知無し、通知有で変わります
+- ⑥ 通信エラーの場合はエラーAlert(MUI)が表示されます
+- ⑦ 通知リストを表示する際に移動型のアニメーションが使われます
+    - 通信エラーがない場合のみ表示されます
+    - アニメーションはSlide(MUI)コンポーネントを使っています
+- ⑧ 通知リスト表示コンポーネントを利用
 
 ## インストール・起動方法
 
